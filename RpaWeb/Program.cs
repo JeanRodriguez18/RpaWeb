@@ -8,8 +8,6 @@ using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 using System;
 using System.IO;
-using RpaWeb;
-
 
 // Ingrese un tema a Investigar
 Console.WriteLine("Ingrese un tema a investigar:");
@@ -125,4 +123,13 @@ enum Browser
     Edge,
     Safari,
     Firefox
+}
+
+public class DriverNotFoundException : Exception
+{
+    public DriverNotFoundException() { }
+
+    public DriverNotFoundException(string message) : base(message) { }
+
+    public DriverNotFoundException(string message, Exception innerException) : base(message, innerException) { }
 }
