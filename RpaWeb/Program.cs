@@ -1,98 +1,128 @@
 ﻿using OpenQA.Selenium;
 using OpenQA.Selenium.Chrome;
-using OpenQA.Selenium.DevTools.V112.Console;
-using OpenQA.Selenium.DevTools.V112.Debugger;
+using OpenQA.Selenium.Firefox;
+using OpenQA.Selenium.Edge;
+using OpenQA.Selenium.IE;
+using OpenQA.Selenium.Safari;
 using OpenQA.Selenium.Support.UI;
 using SeleniumExtras.WaitHelpers;
 using System;
 using System.IO;
+using RpaWeb;
 
-// Configuración de Selenium
-ChromeOptions options = new ChromeOptions();
-options.AddUserProfilePreference("download.default_directory", @"C:\Rpa\Resultados");
-options.AddUserProfilePreference("plugins.always_open_pdf_externally", true);
 
-IWebDriver driver = new ChromeDriver(options);
-WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+// Ingrese un tema a Investigar
+Console.WriteLine("Ingrese un tema a investigar:");
+string TemaInvestigar = Console.ReadLine();
 
-try
+if (string.IsNullOrWhiteSpace(TemaInvestigar))
 {
-    // Abrir el buscador de Google
-    driver.Navigate().GoToUrl("https://www.google.com");
+    Console.WriteLine("No ha Ingresado un tema valido. Presione cualquier tecla para salir de la aplicacion.");
+    Console.ReadKey();
+    Environment.Exit(0);
+}
 
-    // Buscar el tema de investigación en el buscador
-    Console.WriteLine("Ingrese el tema a investigar:");
-    string temaDeInvestigacion = Console.ReadLine();
+BuscarTemaAinvestigar(Browser.Chrome, TemaInvestigar);
+BuscarTemaAinvestigar(Browser.Edge, TemaInvestigar);
+BuscarTemaAinvestigar(Browser.Safari, TemaInvestigar);
+BuscarTemaAinvestigar(Browser.Firefox, TemaInvestigar);
 
-    if (string.IsNullOrWhiteSpace(temaDeInvestigacion))
+Console.WriteLine("Presione cualquier tecla para salir de la aplicacion.");
+Console.ReadKey();
+
+
+
+static void BuscarTemaAinvestigar(Browser browser, string TemaAInvestigar)
+{
+    IWebDriver driver;
+
+    try
     {
-        Console.WriteLine("No ha ingresado un tema válido. Presione cualquier tecla para cerrar la aplicación.");
-        Console.ReadKey();
+        driver = GetDriver(browser);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"No se pudo abrir {browser} porque no esta instalado. {ex.Message}");
         return;
     }
 
-    IWebElement searchInput = wait.Until(ExpectedConditions.ElementIsVisible(By.Name("q")));
-    searchInput.SendKeys(temaDeInvestigacion);
-    searchInput.Submit();
-
-    // Esperar a que aparezcan los resultados de búsqueda
-    IWebElement searchResults = wait.Until(ExpectedConditions.ElementIsVisible(By.Id("search")));
-
-    // Obtener los enlaces principales de los resultados de búsqueda
-    IReadOnlyCollection<IWebElement> mainLinks = searchResults.FindElements(By.CssSelector("div.g:not(.g-blk) a:not(.fl)"));
-
-    // Crear el directorio para almacenar los resultados
-    string resultadosFolderPath = @"C:\Rpa\Resultados\Google Chrome";
-    Directory.CreateDirectory(resultadosFolderPath);
-
-    // Tomar una captura de pantalla de la primera página de cada enlace principal
-    var iterador = 1;
-    foreach (IWebElement link in mainLinks)
+    try
     {
-        string url = link.GetAttribute("href");
+        driver.Navigate().GoToUrl("https://www.google.com");
 
-        if (!url.Contains("google") && !url.Contains("youtube") && !url.Contains("googleusercontent"))
-        {
-            // Abrir el enlace en una nueva pestaña
-            ((IJavaScriptExecutor)driver).ExecuteScript("window.open();");
-            driver.SwitchTo().Window(driver.WindowHandles[1]);
+        IWebElement searchInput = driver.FindElement(By.Name("q"));
+        searchInput.SendKeys($"{TemaAInvestigar} filetype:pdf");
+        searchInput.Submit();
 
-            try
-            {
-                driver.Navigate().GoToUrl(url);
-                // Esperar un máximo de 60 segundos para que la página se cargue completamente
-                WebDriverWait pageLoadWait = new WebDriverWait(driver, TimeSpan.FromSeconds(30));
-                pageLoadWait.Until(d => ((IJavaScriptExecutor)d).ExecuteScript("return document.readyState").Equals("complete"));
-            }
-            catch (WebDriverException)
-            {
-                Console.WriteLine("La página ha tardado demasiado en cargar. Regresando a los resultados de búsqueda.");
-                driver.Close();
-                driver.SwitchTo().Window(driver.WindowHandles[0]);
-                continue;
-            }
+        WebDriverWait wait = new WebDriverWait(driver, TimeSpan.FromSeconds(10));
+        IWebElement searchResults = wait.Until(ExpectedConditions.ElementIsVisible(By.Id("search")));
 
-            // Tomar la captura de pantalla de la página actual
-            Screenshot screenshot = ((ITakesScreenshot)driver).GetScreenshot();
-
-            // Obtener el título de la página para utilizarlo como nombre del archivo
-            string pageTitle = driver.Title;
-            string fileName = Path.Combine(resultadosFolderPath, $"resultado{iterador}.png");
-
-            // Guardar la captura de pantalla
-            screenshot.SaveAsFile(fileName, ScreenshotImageFormat.Png);
-
-            Console.WriteLine($"Captura de pantalla guardada: {pageTitle}");
-            iterador++;
-            // Cerrar la pestaña actual y volver a la página de resultados de búsqueda
-            driver.Close();
-            driver.SwitchTo().Window(driver.WindowHandles[0]);
-        }
-        
+    }
+    finally
+    {
+        driver.Manage().Window.Minimize();
     }
 }
-finally
+
+static IWebDriver GetDriver(Browser browser)
 {
-    // Cerrar el navegador
-    driver.Quit();
+    switch (browser)
+    {
+        case Browser.Chrome:
+            try
+            {
+                ChromeOptions chromeOptions = new ChromeOptions();
+                chromeOptions.AddUserProfilePreference("download.default_directory", @"C:\Rpa\Resultados");
+                chromeOptions.AddUserProfilePreference("plugins.always_open_pdf_externally", true);
+                return new ChromeDriver(chromeOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new DriverNotFoundException("Chrome driver no se ha encontrado. Asegurate de que este instalado.", ex);
+            }
+
+        case Browser.Edge:
+            try
+            {
+                EdgeOptions edgeOptions = new EdgeOptions();
+                return new EdgeDriver(edgeOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new DriverNotFoundException("Microsoft Edge no se ha encontrado. Asegurate de que este instalado.", ex);
+            }
+
+
+        case Browser.Safari:
+            try
+            {
+                return new SafariDriver();
+            }
+            catch (Exception ex)
+            {
+                throw new DriverNotFoundException("Safari browser not found. Please make sure it is installed.", ex);
+            }
+
+
+        case Browser.Firefox:
+            try
+            {
+                FirefoxOptions firefoxOptions = new FirefoxOptions();
+                return new FirefoxDriver(firefoxOptions);
+            }
+            catch (Exception ex)
+            {
+                throw new DriverNotFoundException("Firefox no se ha encontrado. Asegurese de que este instalado.", ex);
+            }
+        default:
+            throw new ArgumentException("Navegador Invalido.");
+    }
+}
+
+enum Browser
+{
+    Chrome,
+    Edge,
+    Safari,
+    Firefox
 }
